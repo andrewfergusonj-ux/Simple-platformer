@@ -1,0 +1,135 @@
+document.addEventListener('DOMContentLoaded', () => {
+    const player = document.getElementById('player');
+    const gameContainer = document.getElementById('game-container');
+    const platforms = document.querySelectorAll('.platform');
+
+    // --- Game Variables ---
+    const gravity = 0.8;
+    const terminalVelocity = 15;
+    const jumpPower = -15;
+    const moveSpeed = 5;
+    const doubleJumpPower = -12;
+
+    let posX = 50;
+    let posY = gameContainer.offsetHeight - 50 - 30; // Initial Y (Ground - Player Height)
+    let velY = 0;
+    let isOnGround = false;
+    let jumpsLeft = 2; // For double jump (1: single, 2: double)
+
+    const keys = {
+        ArrowRight: false,
+        ArrowLeft: false,
+        Space: false
+    };
+
+    // --- Key Handlers ---
+    document.addEventListener('keydown', (e) => {
+        if (keys.hasOwnProperty(e.code)) {
+            keys[e.code] = true;
+            if (e.code === 'Space' && (isOnGround || jumpsLeft > 0)) {
+                // Prevent hold-jumping
+                if (!e.repeat) {
+                    jump();
+                }
+            }
+        }
+    });
+
+    document.addEventListener('keyup', (e) => {
+        if (keys.hasOwnProperty(e.code)) {
+            keys[e.code] = false;
+        }
+    });
+
+    // --- Movement/Physics Functions ---
+    function jump() {
+        if (isOnGround) {
+            velY = jumpPower;
+            isOnGround = false;
+            jumpsLeft = 1; // Used up the first jump
+        } else if (jumpsLeft > 0) {
+            velY = doubleJumpPower;
+            jumpsLeft = 0; // Used up the double jump
+            player.style.backgroundColor = '#00ffff'; // Visual cue for double jump
+            setTimeout(() => player.style.backgroundColor = '#ff4500', 200);
+        }
+    }
+
+    function applyGravity() {
+        velY += gravity;
+        // Cap terminal velocity
+        if (velY > terminalVelocity) {
+            velY = terminalVelocity;
+        }
+        posY += velY;
+    }
+
+    function checkCollision() {
+        // Player boundary box
+        const playerRect = player.getBoundingClientRect();
+        
+        isOnGround = false; // Reset status every frame
+
+        platforms.forEach(platform => {
+            const platRect = platform.getBoundingClientRect();
+
+            // Simple AABB collision check
+            if (playerRect.left < platRect.right &&
+                playerRect.right > platRect.left &&
+                playerRect.top < platRect.bottom &&
+                playerRect.bottom > platRect.top) {
+
+                // Check for collision from above (landing)
+                if (velY > 0 && playerRect.bottom <= platRect.top + velY) {
+                    posY = platRect.top - gameContainer.getBoundingClientRect().top - playerRect.height;
+                    velY = 0;
+                    isOnGround = true;
+                    jumpsLeft = 2; // Reset jumps
+                }
+                // (You would add logic here for side/bottom collision if needed)
+            }
+        });
+
+        // Fall-through boundary for the bottom of the game container (in case they miss a platform)
+        const containerBottom = gameContainer.offsetHeight;
+        if (posY + playerRect.height >= containerBottom) {
+             // Treat bottom of screen as ground
+            posY = containerBottom - playerRect.height;
+            velY = 0;
+            isOnGround = true;
+            jumpsLeft = 2; // Reset jumps
+        }
+    }
+
+
+    // --- Game Loop (The Heart) ---
+    function gameLoop() {
+        // 1. Horizontal Movement
+        if (keys.ArrowRight) {
+            posX += moveSpeed;
+        }
+        if (keys.ArrowLeft) {
+            posX -= moveSpeed;
+        }
+
+        // Keep player within bounds
+        posX = Math.max(0, Math.min(posX, gameContainer.offsetWidth - player.offsetWidth));
+
+        // 2. Vertical Movement & Physics
+        if (!isOnGround) {
+            applyGravity();
+        }
+
+        // 3. Collision Detection
+        checkCollision();
+        
+        // 4. Update Player Position on Screen
+        player.style.left = `${posX}px`;
+        player.style.top = `${posY}px`;
+
+        requestAnimationFrame(gameLoop); // Call the next frame
+    }
+
+    // Start the game
+    gameLoop();
+});
